@@ -14,7 +14,7 @@ Persian (RTL) Streamlit app that analyses Iranian **bank audit reports** (PDF) w
 - **Before each step (or batch of owner points):** hold a decision session. First explain how it works today (visually when it isn't trivial), then list only the real open points with a recommendation each and wait for answers. Never implement on assumed answers. What worked well: an Artifact page (today / proposal / questions, recommendations preselected, a copy-answers box); the owner pastes back "Q1: A …", sometimes with notes that refine an option. Their notes override the option text.
 - **After each step (D-0.5, since 2b):** build, run the tests, check the UI on a scratch server, commit, then tell the owner exactly what to test. Their points come back as the next batch. Final review round after Step 4.
 - Record every new/changed decision in `docs/DECISIONS.md` (one section per batch) and update "▶ Where we are" in `docs/PLAN.md`.
-- Branch `refactor/v2`; one commit per step or batch.
+- Work on `main` (since D-15.7) and push it to remote `github` (Posit redeploys on push); one commit per step or batch. `refactor/v2` is a frozen local archive of the full history.
 - UI conventions: pages are direct scripts in `app_pages/`; use `ui/components.py` (help_box, cards_row, page_title, usage_bar, file_label) and key prefixes `danger_`/`warn_` for colored buttons; escape user/LLM text with `md_escape` / `html.escape`. One request view (`ui/request_view.py`) serves Analysis and History. Long lists use expanders with `key=` + `on_change="rerun"` and render content only when `.open` (lazy). Data grids are LTR: reverse columns and keep the total width inside the page (fixed pixel widths).
 
 ## Hard rules
