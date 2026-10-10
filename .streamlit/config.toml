@@ -1,0 +1,49 @@
+[server]
+enableStaticServing = true
+maxUploadSize = 300  # MB; ZIP limit (D-10.4); single PDFs are checked against 20 MB in the app
+runOnSave = false
+# No source watching (D-11.1): on any source change Streamlit re-imports every project module,
+# which splits process-wide state (analysis engine, rate limiter, DB engine) from the copies
+# held by the cookie routes and running threads. Restart the server after editing code.
+fileWatcherType = "none"
+
+[client]
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
+font = "Vazirmatn"
+headingFont = "Vazirmatn"
+baseFontSize = 15
+headingFontWeights = [800, 700, 700, 600, 600, 600]
+primaryColor = "#1e293b"
+backgroundColor = "#f8fafc"
+secondaryBackgroundColor = "#eef2f7"
+textColor = "#0f172a"
+borderColor = "#d5dde8"
+linkColor = "#0054a3"
+baseRadius = "10px"
+buttonRadius = "10px"
+showWidgetBorder = true
+showSidebarBorder = false
+greenColor = "#15803d"
+redColor = "#b42318"
+orangeColor = "#c2410c"
+yellowColor = "#a16207"
+blueColor = "#0054a3"
+dataframeHeaderBackgroundColor = "#e2e8f0"
+
+[[theme.fontFaces]]
+family = "Vazirmatn"
+url = "app/static/fonts/Vazirmatn-Variable.woff2"
+weight = "100 900"
+
+[theme.sidebar]
+backgroundColor = "#0f172a"
+secondaryBackgroundColor = "#1e293b"
+textColor = "#e2e8f0"
+borderColor = "#334155"
+primaryColor = "#4ed793"

@@ -1,0 +1,6 @@
+.env
+app_log.txt
+__pycache__/
+data/
+.pytest_cache/
+samples/

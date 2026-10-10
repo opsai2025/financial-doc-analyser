@@ -1,0 +1,276 @@
+/* Design system — see "ui ux design rules.docx" and docs/DECISIONS.md §9.
+   Colors/fonts come from .streamlit/config.toml; this file only adds what theming cannot:
+   RTL layout, right-hand sidebar, header, rule-based buttons, help boxes and card tones. */
+
+/* ---------- RTL & right-hand sidebar ---------- */
+[data-testid="stAppViewContainer"],
+[data-testid="stSidebar"],
+[data-testid="stMain"],
+[data-testid="stBottomBlockContainer"],
+div[role="dialog"] {
+  direction: rtl;
+}
+[data-testid="stMarkdownContainer"],
+[data-testid="stCaptionContainer"],
+[data-testid="stWidgetLabel"],
+[data-testid="stAlertContentInfo"],
+[data-testid="stAlertContentSuccess"],
+[data-testid="stAlertContentWarning"],
+[data-testid="stAlertContentError"] {
+  text-align: right;
+}
+/* Collapsing: Streamlit slides the sidebar out with translateX(-width), which in RTL moves it
+   *into* the page. Keep it in place and clip it to its (animated) zero width instead. */
+[data-testid="stSidebar"][aria-expanded="false"] {
+  transform: none !important;
+  overflow: hidden !important;
+}
+/* Mirror the collapse/expand chevrons for a right-hand sidebar. */
+[data-testid="stSidebarCollapseButton"] button > *,
+[data-testid="stExpandSidebarButton"] > * {
+  transform: scaleX(-1);
+}
+/* The drag-to-resize handle works in LTR only (it would sit on the screen edge); disable it. */
+[data-testid="stSidebarResizeHandle"] {
+  display: none !important;
+}
+/* The top toolbar gets a solid background when the sidebar is collapsed and hides the page header. */
+[data-testid="stHeader"] {
+  background: transparent !important;
+}
+/* Streamlit's English "Press Enter to apply/submit" hints overlap RTL text; hide them. */
+[data-testid="InputInstructions"] {
+  display: none !important;
+}
+
+[data-testid="stMarkdownContainer"] ul,
+[data-testid="stMarkdownContainer"] ol {
+  padding-left: 0;
+  padding-right: 1.25rem;
+  margin-right: 0;
+}
+[data-testid="stMarkdownContainer"] :is(p, li, h1, h2, h3, h4, h5, h6) {
+  text-align: right;
+}
+[data-testid="stMarkdownContainer"] li {
+  margin: 0.15rem 0;
+}
+/* Latin-only inputs (usernames, passwords, numbers) stay left-to-right */
+input[type="password"],
+input[type="number"],
+[class*="st-key-fda_ltr"] input {
+  direction: ltr;
+  text-align: left;
+}
+
+/* ---------- Page spacing (header padding-top ≈ 2.5rem) ---------- */
+[data-testid="stMainBlockContainer"] {
+  padding-top: 2.5rem !important;
+  padding-bottom: 3rem;
+}
+
+/* ---------- App header ---------- */
+.fda-header {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  border-radius: 16px;
+  padding: 1.6rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+  direction: rtl;
+}
+.fda-header-icon {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: rgba(78, 215, 147, 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fda-header h1 {
+  color: #4ed793;
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin: 0;
+  padding: 0;
+  line-height: 1.5;
+}
+.fda-header p {
+  color: #cbd5e1;
+  margin: 0.25rem 0 0;
+  font-size: 0.98rem;
+}
+
+/* ---------- Sidebar ---------- */
+.fda-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.2rem 0 0.8rem;
+  direction: rtl;
+}
+.fda-brand-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #14b8a6 0%, #4ed793 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.fda-brand-title {
+  color: #f8fafc;
+  font-weight: 800;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+[data-testid="stSidebarNavSeparator"] {
+  border-color: #334155;
+}
+
+/* ---------- Buttons (rule: high contrast + border pattern) ---------- */
+.stButton button[kind="primary"],
+.stFormSubmitButton button[kind="primaryFormSubmit"],
+.stDownloadButton button[kind="primary"] {
+  background-color: #1e293b !important;
+  border: 3px solid #4ed793 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+.stButton button[kind="primary"]:hover,
+.stFormSubmitButton button[kind="primaryFormSubmit"]:hover {
+  background-color: #0f172a !important;
+}
+.stButton button[kind="secondary"],
+.stFormSubmitButton button[kind="secondaryFormSubmit"] {
+  background-color: #ffffff;
+  border: 2px solid #94a3b8;
+  color: #0f172a;
+  font-weight: 600;
+}
+[class*="st-key-danger_"] button {
+  background-color: #a43232 !important;
+  border: 3px solid #f65858 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+[class*="st-key-warn_"] button {
+  background-color: #a16207 !important;
+  border: 3px solid #facc15 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+[data-testid="stSidebar"] [class*="st-key-danger_"] button {
+  width: 100%;
+}
+
+/* ---------- Help boxes (rule: green #daf39e/black or blue rgba(28,131,255,.1)/#0054A3) ---------- */
+[class*="st-key-helpgreen_"] {
+  background-color: #daf39e;
+  border-radius: 12px;
+  padding: 0.9rem 1.2rem;
+}
+[class*="st-key-helpgreen_"] * {
+  color: #000000 !important;
+}
+[class*="st-key-helpblue_"] {
+  background-color: rgba(28, 131, 255, 0.1);
+  border: 1px solid rgba(28, 131, 255, 0.25);
+  border-radius: 12px;
+  padding: 0.9rem 1.2rem;
+}
+[class*="st-key-helpblue_"] * {
+  color: #0054a3 !important;
+}
+
+/* ---------- Status cards (conditional tones) ---------- */
+[class*="st-key-card_"] [data-testid="stMetric"] {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #d5dde8;
+  border-inline-start: 6px solid #64748b;
+  padding: 0.9rem 1.1rem;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+[class*="st-key-card_success_"] [data-testid="stMetric"] { border-inline-start-color: #16a34a; background: #f0fdf4; }
+[class*="st-key-card_info_"] [data-testid="stMetric"]    { border-inline-start-color: #0054a3; background: #eff6ff; }
+[class*="st-key-card_warning_"] [data-testid="stMetric"] { border-inline-start-color: #d97706; background: #fffbeb; }
+[class*="st-key-card_danger_"] [data-testid="stMetric"]  { border-inline-start-color: #dc2626; background: #fef2f2; }
+[class*="st-key-card_"] [data-testid="stMetricValue"] {
+  font-weight: 800;
+  font-size: 1.65rem;
+}
+[class*="st-key-card_"] [data-testid="stMetricValue"] > div {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* ---------- Tabs ---------- */
+[data-testid="stTabs"] [data-baseweb="tab-list"] {
+  gap: 0.4rem;
+}
+[data-testid="stTabs"] button[data-baseweb="tab"] {
+  font-weight: 600;
+}
+
+/* ---------- Data grids: the canvas grid is LTR-only; pages reverse column order instead ---------- */
+[data-testid="stDataFrame"] {
+  direction: ltr;
+}
+
+/* ---------- Usage bars (D-12.14) ---------- */
+.fda-usage {
+  direction: rtl;
+  margin: 0.2rem 0 0.6rem;
+}
+.fda-usage-text {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.92rem;
+  margin-bottom: 0.25rem;
+}
+.fda-usage-track {
+  height: 10px;
+  background: #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.fda-usage-fill {
+  height: 100%;
+  border-radius: 6px;
+  background: #16a34a;
+}
+.fda-usage-high .fda-usage-fill { background: #d97706; }
+.fda-usage-full .fda-usage-fill { background: #dc2626; }
+
+/* ---------- File uploader: Persian texts instead of Streamlit's English ones (D-12.16) ---------- */
+[data-testid="stFileUploaderDropzoneInstructions"] {
+  display: none;
+}
+/* Empty uploader: drag hint + "choose file" button (once files are added, Streamlit shows chips) */
+[data-testid="stFileUploaderDropzone"]:not(:has([data-testid="stFileChips"]))::before {
+  content: "فایل‌ها را به اینجا بکشید و رها کنید";
+  color: #475569;
+  font-size: 0.92rem;
+}
+[data-testid="stFileUploaderDropzone"] button[data-testid="stBaseButton-secondary"] {
+  white-space: nowrap;
+}
+/* Hide Streamlit's own "Upload" label and icon (their spans set their own font size) */
+[data-testid="stFileUploaderDropzone"] button[data-testid="stBaseButton-secondary"] > * {
+  display: none !important;
+}
+[data-testid="stFileUploaderDropzone"] button[data-testid="stBaseButton-secondary"]::after {
+  content: "انتخاب فایل";
+  font-size: 0.95rem;
+}
+/* File names keep their own direction ("1398.pdf", not "pdf.1398") */
+[data-testid="stFileChipName"] {
+  unicode-bidi: plaintext;
+}

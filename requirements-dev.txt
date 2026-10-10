@@ -1,0 +1,3 @@
+-r requirements.txt
+pytest>=8
+playwright>=1.40           # scripts/ui_screenshots.py (uses the installed Chrome: channel="chrome")
