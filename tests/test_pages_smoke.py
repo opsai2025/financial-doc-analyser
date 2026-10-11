@@ -82,3 +82,12 @@ def test_session_only_login_when_cookie_routes_are_missing(env, pages):
     again.query_params["ticket"] = "used-or-unknown"
     again.run()
     assert "user" not in again.session_state
+
+
+def test_app_py_as_page_script_runs_the_ui(env, pages):
+    """Hosts without st.App discovery (Posit Connect Cloud) execute app.py as the page script."""
+    pages("analysis", env.user("ali", Role.ANALYST))  # applies the fixture's patches
+    at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=30)
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    assert any(b.label == "ورود" for b in at.button)  # the login form of streamlit_app.py
