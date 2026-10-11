@@ -18,7 +18,9 @@ Workflow per step: decision session (explain current behaviour first, visually) 
 **State:** Steps 1–3, round 1 and a reduced Step 4 (deploy-readiness, DECISIONS §15) are committed on `refactor/v2` and published to the owner's repo as one snapshot commit on `main` (D-15.7; full history only in the local `refactor/v2`). The owner accepted all built features without testing (detailed checks later, in production) and wants the app on **Posit Connect Cloud (free plan)** as soon as possible.
 
 **Verified:** 136 tests on SQLite and on Postgres 17 (`TEST_DATABASE_URL`, Docker), including migrations → exact model schema on Postgres; a scratch server on Postgres in Chrome (login + refresh, logout, a running request with the keep-open hint, session-only login without cookie routes).
-**Not verified yet:** the Supabase Storage adapter against real Supabase (only mocked) and the upload size limit of Posit's proxy. Posit does **not** launch `app.py` as `st.App` (D-15.8): login there lasts per browser tab; persistent login is an open question (D-15.8).
+**Not verified yet:** the Supabase Storage adapter against real Supabase (only mocked) and the upload size limit of Posit's proxy. Posit does **not** launch `app.py` as `st.App` (D-15.8): login there lasts per browser tab; the login is kept by a Posit-only workaround (D-15.9).
+
+**⚠ Reminder:** D-15.9 (script-set session cookie) is a **Posit-only workaround**. When the app is deployed anywhere else, undo it (block `POSIT WORKAROUND` in `ui/session.py`).
 
 **Next steps, in order:**
 1. **Owner deploys** (docs/SETUP.md §7): `main` is pushed to the owner's repo (D-15.7); Supabase prod project; new Posit content from that repo with the Variables. Then the first checks in §7.4. Problems come back as a batch.

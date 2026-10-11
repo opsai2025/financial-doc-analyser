@@ -91,3 +91,12 @@ def test_app_py_as_page_script_runs_the_ui(env, pages):
     at.run()
     assert not at.exception, [e.message for e in at.exception]
     assert any(b.label == "ورود" for b in at.button)  # the login form of streamlit_app.py
+
+
+def test_script_cookie_js():
+    """Posit workaround (D-15.9): the cookie string is one JS literal, scoped and expiring."""
+    from ui.components import script_cookie_js
+
+    js = script_cookie_js("fda_session", "abc.def-_", 3600)
+    assert js.startswith('document.cookie = "fda_session=abc.def-_; Path=/; Max-Age=3600; SameSite=Lax"')
+    assert '"; Secure"' in js and "</" not in script_cookie_js("x", "</script>", 0)

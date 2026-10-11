@@ -107,7 +107,7 @@ Tables and the storage bucket are created automatically at the first start (migr
 
 ### 7.4 First checks after deploy
 1. Open the app → log in with `ADMIN_USERNAME` / `ADMIN_INITIAL_PASSWORD` → set a new password.
-2. Known limitation on Posit (D-15.8): Posit runs `app.py` as the page script, without the login-cookie routes, so a login lasts for the open browser tab only. Moving between pages keeps you logged in; a browser refresh or a new tab asks for the password again (the log says "Cookie routes are not served").
+2. **Refresh the browser**: you stay logged in. Posit runs `app.py` as the page script, without the login-cookie routes (D-15.8), so on Posit the browser stores the session cookie itself (D-15.9, the log says "script-set session cookie"). **When deploying anywhere other than Posit, undo D-15.9** (see DECISIONS).
 3. Add a provider, model and key (section 5) → **آزمون اتصال** → analyse one PDF → download the Excel → open the dashboard.
 4. Create the real users (Admin → User management).
 

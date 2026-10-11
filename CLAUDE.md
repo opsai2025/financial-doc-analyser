@@ -24,6 +24,7 @@ Persian (RTL) Streamlit app that analyses Iranian **bank audit reports** (PDF) w
 - LLM values are stored as text, normalized with Level A only; Level B only for comparison keys (`core/text_normalize.py`, D-7).
 - Batch processing: one document's failure must never affect others; always report per-document status.
 - Never put unescaped model output or filenames into `unsafe_allow_html` markup.
+- **Posit-only workaround D-15.9:** on Posit the session cookie is set by browser script (not HttpOnly). When the app is deployed anywhere else, undo it (block `POSIT WORKAROUND` in `ui/session.py`) and tell the owner.
 - UI: fully RTL, sidebar on the right, Vazirmatn, Material icons (not emojis), navy header `#0f172a→#1e293b` with title `#4ed793`, high-contrast buttons, results ordered cards → charts → tables.
 - All user-facing text in Persian; code identifiers, comments and logs in English.
 

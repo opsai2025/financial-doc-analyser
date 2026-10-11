@@ -112,11 +112,23 @@ def _js_string(value: str) -> str:
     return json.dumps(value).replace("</", "<\\/")  # a JS string literal that cannot close the script tag
 
 
-def redirect(url: str, fallback: str) -> None:
+def script_cookie_js(name: str, value: str, max_age: int) -> str:
+    """JS that sets (max_age > 0) or deletes (max_age 0) a cookie readable by scripts (D-15.9).
+
+    Browsers ignore it for an HttpOnly cookie of the same name, so deleting is harmless there.
+    """
+    secure = ' + (location.protocol === "https:" ? "; Secure" : "")'
+    return (f'document.cookie = {_js_string(f"{name}={value}; Path=/; Max-Age={max_age}; SameSite=Lax")}'
+            f"{secure};")
+
+
+def redirect(url: str, fallback: str, before: str = "") -> None:
     """Navigate the browser to a cookie route (`auth/...`), or to `fallback` when the host does not serve
-    those routes (app not launched through `app.py`). URLs must be app-generated, never user input."""
+    those routes (app not launched through `app.py`). URLs must be app-generated, never user input.
+    `before` is app-generated JS run first (e.g. script_cookie_js)."""
     st.html(
         f"""<script>{{
+        {before}
         const go = (u) => window.location.replace(u);
         fetch("auth/ping", {{cache: "no-store"}})
           .then((r) => r.text())
