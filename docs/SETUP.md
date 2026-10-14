@@ -68,7 +68,7 @@ python scripts/check_provider.py samples/1398.pdf
 It prints duration, tokens and schema violations and saves the raw JSON to `data/`.
 
 ## 7. Deploy on Posit Connect Cloud (free plan)
-The free plan publishes from a **public** GitHub repository: `roozbahani-workspace/financial-doc-analysor`, branch `main`.
+The free plan publishes from a **public** GitHub repository: `roozbahani-workspace/financial-doc-analysor` or its mirror `opsai2025/financial-doc-analyser` (both get every push, D-15.10), branch `main`.
 Secrets are never in the repository: they are content **Variables** on Posit (read with `os.getenv`; Posit does not support `st.secrets`).
 
 ### 7.1 Before the first deploy
@@ -100,7 +100,7 @@ Secrets are never in the repository: they are content **Variables** on Posit (re
 
 ### 7.3 Publish
 - **First time**: Publish → GitHub → repository `roozbahani-workspace/financial-doc-analysor`, branch `main`, primary file **`app.py`** (not `streamlit_app.py`: `app.py` adds the login-cookie routes), Python **3.13** (3.12 also works). Add the variables in the publish dialog (or right after, then Republish). Turn on "Automatically publish on push".
-- **Updates**: push `main` (`git push github main`); Posit redeploys.
+- **Updates**: `git push github main` pushes to both repos; Posit redeploys from the one it is linked to.
 - The old v1 content (linked to the old repo) is not affected; delete it in Posit when v2 runs.
 
 Tables and the storage bucket are created automatically at the first start (migrations run on startup).
