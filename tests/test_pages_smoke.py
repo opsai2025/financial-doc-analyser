@@ -43,7 +43,7 @@ def test_pages_for_each_role(env, pages):
     env.run(guest, [pdf("1399.pdf")])
 
     at = pages("analysis", ali, an_current=state.id)
-    assert any("دانلود اکسل" in b.label for b in at.get("download_button"))
+    assert {"دانلود اکسل", "گزارش Word"} <= {b.label for b in at.get("download_button")}
     pages("analysis", guest)
     pages("analysis", admin)
     for user in (ali, viewer, admin):  # the request's section opened: its view loads (D-14.9)

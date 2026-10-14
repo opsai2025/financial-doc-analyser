@@ -61,7 +61,7 @@ def workbook_name(state: RequestState) -> str:
 
 
 @dataclass
-class _Doc:
+class DocRows:
     doc: DocState
     rows: dict[str, list[dict]] | None  # sheet key -> rows (db column names); None = no result available
     provider: str
@@ -70,7 +70,7 @@ class _Doc:
     notes: list[str] = field(default_factory=list)  # cells adjusted in Excel (D-12.12)
 
 
-def _collect(state: RequestState) -> list[_Doc]:
+def collect_docs(state: RequestState) -> list[DocRows]:
     """Result rows and metadata of every document, from the DB or from memory."""
     collected = []
     with session_scope() as db:
@@ -89,7 +89,7 @@ def _collect(state: RequestState) -> list[_Doc]:
                                                 table.c.document_id == doc.document_id).order_by(table.c.row_no))]
             elif doc.status == SUCCEEDED and doc.data is not None:
                 rows = results.prepare(doc.data).rows
-            collected.append(_Doc(doc, rows, provider, model, analysed_at))
+            collected.append(DocRows(doc, rows, provider, model, analysed_at))
     return collected
 
 
@@ -183,7 +183,7 @@ def _sheet_value(column: str, value):
 
 
 def build_workbook(state: RequestState) -> bytes:
-    docs = _collect(state)
+    docs = collect_docs(state)
     workbook = Workbook()
     workbook.remove(workbook.active)
 

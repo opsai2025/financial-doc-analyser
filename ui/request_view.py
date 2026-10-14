@@ -20,6 +20,7 @@ from services import app_settings, history, results
 from services import providers as pv
 from services.auth import CurrentUser
 from services.excel import build_workbook, workbook_name
+from services.report import build_report, report_name
 from services.jobs import (
     DUPLICATE,
     FAILED,
@@ -157,12 +158,18 @@ def _actions(state: RequestState, user: CurrentUser, key: str, on_deleted: Calla
         st.caption(f":material/schedule: نتایج این درخواست ذخیره نمی‌شوند و تا ساعت "
                    f"{fa_digits(to_tehran(expires).strftime('%H:%M'))} (وقت تهران) در دسترس هستند.")
 
-    c1, c2, c3, _ = st.columns([1, 1, 1, 1])
+    c1, c4, c2, c3 = st.columns([1, 1, 1, 1])
     c1.download_button(
         "دانلود اکسل", lambda: build_workbook(manager.get(state.id, user) or state), file_name=workbook_name(state),
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary",
         icon=":material/download:", key=f"{key}_excel_{state.id}", on_click="ignore", width="stretch",
         help="در حین اجرا، اسناد تمام‌شده با نتیجه و بقیه فقط در برگه وضعیت می‌آیند." if running else None,
+    )
+    c4.download_button(  # D-16.1: same rows as the Excel, laid out for reading
+        "گزارش Word", lambda: build_report(manager.get(state.id, user) or state), file_name=report_name(state),
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", type="primary",
+        icon=":material/description:", key=f"{key}_word_{state.id}", on_click="ignore", width="stretch",
+        help="در حین اجرا، فقط اسناد تمام‌شده در گزارش می‌آیند." if running else None,
     )
     if any(d.status in (SUCCEEDED, REUSED) for d in state.docs) and c2.button(
             "نمایش در داشبورد", icon=":material/monitoring:", key=f"{key}_dash_{state.id}", width="stretch"):
