@@ -10,22 +10,25 @@ Decisions referenced as `D-x.y` live in [DECISIONS.md](DECISIONS.md). Problems o
 | 2a | Providers/keys admin, access grants, engine, persistence | ✅ approved & committed (feedback round: DECISIONS §11, D-11.1–D-11.18) |
 | 2b | Upload UI + version picker, history, guest results, Excel, usage bars | ✅ committed (DECISIONS §12, D-12.1–D-12.16); owner's test points deferred to the final review round |
 | 3 | Results dashboard | ✅ committed with the recommended answers (DECISIONS §13); round 1 refinements committed (DECISIONS §14) |
-| 4 | Deploy-readiness (reduced, D-15.1); exports/settings polish deferred | ✅ committed (DECISIONS §15); deployment on Posit pending (owner) |
+| 4 | Deploy-readiness (reduced, D-15.1); exports/settings polish deferred | ✅ committed and **deployed on Posit** (DECISIONS §15) |
 
 Workflow per step: decision session (explain current behaviour first, visually) → implement → commit → owner tests → refinements (D-0.1, D-0.5).
 
-## ▶ Where we are (handoff, 2026-10-11)
-**State:** Steps 1–3, round 1 and a reduced Step 4 (deploy-readiness, DECISIONS §15) are committed on `refactor/v2` and published to the owner's repo as one snapshot commit on `main` (D-15.7; full history only in the local `refactor/v2`). The owner accepted all built features without testing (detailed checks later, in production) and wants the app on **Posit Connect Cloud (free plan)** as soon as possible.
+## ▶ Where we are (handoff, 2026-10-14)
+**State:** all four steps are built (Step 4 reduced to deploy-readiness, D-15.1). The app **runs on Posit Connect Cloud (free plan)** with the Supabase **prod** project: https://01a12838-3819-792b-e228-5d14915a5b52.share.connect.posit.cloud. Code is on `main`, pushed to two public repos with `git push github main` (D-15.7, D-15.10). Working tree clean. 137 tests pass (SQLite; also on Postgres via `TEST_DATABASE_URL`).
 
-**Verified:** 136 tests on SQLite and on Postgres 17 (`TEST_DATABASE_URL`, Docker), including migrations → exact model schema on Postgres; a scratch server on Postgres in Chrome (login + refresh, logout, a running request with the keep-open hint, session-only login without cookie routes).
-**Not verified yet:** the Supabase Storage adapter against real Supabase (only mocked) and the upload size limit of Posit's proxy. Posit does **not** launch `app.py` as `st.App` (D-15.8): login there lasts per browser tab; the login is kept by a Posit-only workaround (D-15.9).
+**Found at deployment (fixed):** Posit executes `app.py` as the page script → white page; `app.py` now runs the UI in that case (D-15.8). Posit has no `/auth/*` routes → login kept by a script-set cookie (D-15.9).
 
-**⚠ Reminder:** D-15.9 (script-set session cookie) is a **Posit-only workaround**. When the app is deployed anywhere else, undo it (block `POSIT WORKAROUND` in `ui/session.py`).
+**⚠ Reminder:** D-15.9 is a **Posit-only workaround**. When the app is deployed anywhere else, undo it (block `POSIT WORKAROUND` in `ui/session.py`) and tell the owner.
+
+**Not verified yet (owner's first production check, SETUP §7.4):** login + refresh on Posit after the D-15.9 redeploy, a real provider (Gemini), PDF upload/download through **real Supabase Storage** (only mocked so far), Excel and dashboard in production, upload size limit of Posit's proxy (large ZIP). The owner said they would test; their points come back as a batch.
 
 **Next steps, in order:**
-1. **Owner deploys** (docs/SETUP.md §7): `main` is pushed to the owner's repo (D-15.7); Supabase prod project; new Posit content from that repo with the Variables. Then the first checks in §7.4. Problems come back as a batch.
-2. Optional before that: dev Supabase values in the local `.env` → run the app locally against Supabase (Storage upload/download/delete).
-3. **Deferred backlog** (D-15.1): Word/PDF report, Excel RTL polish, admin-editable defaults and usage overview vs. Supabase limits; then the final review round (items below).
+1. **Owner's production-check points** → handle like round 1 (explain, ask only real choices with recommendations, record a DECISIONS section, build, test, commit, push).
+2. **Deferred backlog** (D-15.1), each with a short decision page: Word/PDF report (if wanted at all), Excel RTL polish, admin-editable defaults (quotas, limits in `core/config.py`) and a usage overview vs. Supabase free limits (500 MB DB, 1 GB storage).
+3. **Final review round**: deferred test points from 2b on, plus the open items below.
+
+**Owner context:** time is very limited — keep decision pages short with recommendations preselected. The dev Supabase project (`fin-doc-dev`) exists but its values are not in the local `.env` yet (local runs use SQLite). `data/posit-secrets.txt` (git-ignored) holds the production `APP_SECRET_KEY`/`APP_ENCRYPTION_KEY`; the owner should keep them in a password manager and may delete the file. Supabase free projects pause after ~7 days without activity.
 
 **Open items for the review round** (raised, not decided):
 - Viewers land on History after login (the Dashboard was empty when this was set); confirm with the owner.
