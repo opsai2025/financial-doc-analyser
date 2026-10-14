@@ -3,9 +3,9 @@ from itertools import groupby
 import pandas as pd
 import streamlit as st
 
-from core.config import MAX_PDF_MB
 from core.fa import fa_digits, fa_number, jalali_date, jalali_datetime
 from core.models import Role, as_utc, utcnow
+from services import app_settings
 from services.providers import API_TYPE_LABELS, usable_models
 from services.quota import MB, quota_status
 from services.users import ROLE_DESCRIPTIONS, ROLE_LABELS
@@ -99,6 +99,7 @@ def shared_providers_view() -> None:
         Card("مدل", fa_number(len(shared)), "model_training", "info"),
         Card("کلید API", fa_number(len({k.id for c in shared for k in c.keys})), "key", "info"),
     ], key="shared_prov")
+    max_pdf_mb = app_settings.get("max_pdf_mb")
     for _, group in groupby(shared, key=lambda c: c.provider_id):
         models = list(group)
         first = models[0]
@@ -108,7 +109,7 @@ def shared_providers_view() -> None:
             table = pd.DataFrame([{
                 "مدل": c.display_name,
                 "شناسه مدل": c.model_name,
-                "سقف حجم هر فایل (مگابایت)": fa_number(min(MAX_PDF_MB, c.max_file_mb or MAX_PDF_MB)),
+                "سقف حجم هر فایل (مگابایت)": fa_number(min(max_pdf_mb, c.max_file_mb or max_pdf_mb)),
                 "کلیدهای قابل استفاده": "، ".join(f"{k.label} (••••{k.last4})" for k in c.keys),
             } for c in models])
             st.dataframe(table[table.columns[::-1]], hide_index=True, column_config={

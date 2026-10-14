@@ -22,7 +22,7 @@ from pathlib import Path
 
 from sqlalchemy import select, update
 
-from core.config import MAX_PDF_MB, PROJECT_ROOT, RETRY_BACKOFF_S, get_settings
+from core.config import PROJECT_ROOT, RETRY_BACKOFF_S, get_settings
 from core.db import session_scope
 from core.fa import fa_digits
 from core.models import (
@@ -38,7 +38,7 @@ from core.models import (
     as_utc,
     utcnow,
 )
-from services import results
+from services import app_settings, results
 from services.auth import CurrentUser
 from services.llm import adapter_for
 from services.llm.base import AnalysisOutput
@@ -391,7 +391,8 @@ class JobManager:
                 key_ids=key_ids, own_keys=choice.own, persist=persist, username=user.username,
                 parent_request_id=parent_request_id,
             )
-            limit_bytes = min(MAX_PDF_MB, choice.max_file_mb or MAX_PDF_MB) * MB
+            max_pdf_mb = app_settings.get("max_pdf_mb")
+            limit_bytes = min(max_pdf_mb, choice.max_file_mb or max_pdf_mb) * MB
             seen: dict[str, str] = {}
             spool: dict[str, bytes] = {}
             for position, item in enumerate(files):

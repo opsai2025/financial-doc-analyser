@@ -1,9 +1,10 @@
 import pandas as pd
 import streamlit as st
 
-from core.config import MAX_PDF_MB, MAX_ZIP_UNCOMPRESSED_MB, get_settings
+from core.config import get_settings
 from core.fa import fa_digits, fa_number, jalali_date, jalali_datetime
 from core.models import Role
+from services import app_settings
 from services import providers as pv
 from services.jobs import JobError, Version, default_version, get_job_manager, order_versions
 from services.quota import MB, quota_status
@@ -122,16 +123,18 @@ with st.container(border=True):
                                     format_func={"pdf": ":material/picture_as_pdf: فایل‌های PDF",
                                                  "zip": ":material/folder_zip: فایل ZIP"}.get) or "pdf"
         nonce = st.session_state.setdefault("an_nonce", 0)
+        limits = app_settings.upload_limits()
         if mode == "pdf":
             uploads = st.file_uploader("فایل‌های PDF گزارش حسابرسی", type=["pdf"], accept_multiple_files=True,
-                                       key=f"an_pdfs_{nonce}", max_upload_size=MAX_PDF_MB)
-            st.caption(f"حداکثر {fa_digits(MAX_PDF_MB)} مگابایت برای هر فایل PDF.")
-            intake = from_pdfs([(f.name, f.getvalue()) for f in uploads]) if uploads else None
+                                       key=f"an_pdfs_{nonce}", max_upload_size=limits.max_pdf_mb)
+            st.caption(f"حداکثر {fa_digits(limits.max_pdf_mb)} مگابایت برای هر فایل PDF و "
+                       f"{fa_digits(limits.max_files)} فایل در هر درخواست.")
+            intake = from_pdfs([(f.name, f.getvalue()) for f in uploads], limits) if uploads else None
         else:
             upload = st.file_uploader("فایل ZIP شامل گزارش‌ها (زیرپوشه‌ها مجاز است)", type=["zip"], key=f"an_zip_{nonce}",
-                                      max_upload_size=MAX_ZIP_UNCOMPRESSED_MB)
-            st.caption(f"حداکثر {fa_digits(MAX_ZIP_UNCOMPRESSED_MB)} مگابایت؛ فایل‌های غیر PDF نادیده گرفته می‌شوند.")
-            intake = from_zip(upload.getvalue()) if upload else None
+                                      max_upload_size=limits.max_zip_mb)
+            st.caption(f"حداکثر {fa_digits(limits.max_zip_mb)} مگابایت؛ فایل‌های غیر PDF نادیده گرفته می‌شوند.")
+            intake = from_zip(upload.getvalue(), limits) if upload else None
 
         if intake is not None:
             if intake.rejected:

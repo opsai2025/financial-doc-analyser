@@ -44,6 +44,16 @@ HEADER_FILL = PatternFill(start_color="CCC0DA", end_color="CCC0DA", fill_type="s
 ALT_FILL = PatternFill(start_color="F7F7F7", end_color="F7F7F7", fill_type="solid")
 THIN = Side(style="thin")
 BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
+# Status colours (Excel's good / neutral / bad styles), number formats and print layout (backlog Q2)
+TONES = {
+    "success": (PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid"), "006100"),
+    "warning": (PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid"), "9C5700"),
+    "danger": (PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid"), "9C0006"),
+}
+NUMBER_FORMATS = {
+    "توکن_ورودی": "#,##0", "توکن_خروجی": "#,##0", "مجموع_توکن_ورودی": "#,##0", "مجموع_توکن_خروجی": "#,##0",
+    "مدت_آخرین_تلاش_ثانیه": "0.0", "مجموع_زمان_پردازش_ثانیه": "0.0",
+}
 
 
 def workbook_name(state: RequestState) -> str:
@@ -107,31 +117,63 @@ def _yes_no(value: bool | None) -> str:
     return "" if value is None else ("بله" if value else "خیر")
 
 
+def _is_long(header: str) -> bool:
+    return any(name in str(header) for name in LONG_TEXT)
+
+
 def _style(ws, headers: tuple[str, ...] | list[str]) -> None:
-    """v1 look (header colour, borders, alternating rows, widths), right-to-left, frozen header, filters."""
+    """v1 look (header colour, borders, alternating rows, widths), right-to-left, frozen header, filters.
+
+    Long text reads from the right edge and the top of the cell; numbers get formats; printing is
+    landscape, one page wide, with the header row on every page.
+    """
     ws.sheet_view.rightToLeft = True
     base_font, header_font = Font(name=FONT, size=11), Font(name=FONT, size=11, bold=True)
-    align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    paragraph = Alignment(horizontal="right", vertical="top", wrap_text=True)
+    long = [_is_long(h) for h in headers]
+    formats = [NUMBER_FORMATS.get(str(h)) for h in headers]
     widths = [len(str(h)) for h in headers]
     for row_index, row in enumerate(ws.iter_rows(), start=1):
         for col_index, cell in enumerate(row):
-            cell.border, cell.alignment = BORDER, align
+            cell.border = BORDER
             if row_index == 1:
-                cell.font, cell.fill = header_font, HEADER_FILL
+                cell.font, cell.fill, cell.alignment = header_font, HEADER_FILL, center
             else:
                 cell.font = base_font
+                cell.alignment = paragraph if long[col_index] else center
+                if formats[col_index]:
+                    cell.number_format = formats[col_index]
                 if row_index % 2 == 0:
                     cell.fill = ALT_FILL
                 if cell.value is not None:
                     widths[col_index] = max(widths[col_index], min(len(str(cell.value)), 200))
-    for index, header in enumerate(headers):
-        long = any(name in str(header) for name in LONG_TEXT)
-        width = min(max(widths[index], 20), 40) if long else min(max(widths[index] + 3, 15), 50)
+    for index in range(len(headers)):
+        width = min(max(widths[index], 20), 40) if long[index] else min(max(widths[index] + 3, 15), 50)
         ws.column_dimensions[get_column_letter(index + 1)].width = width
     ws.row_dimensions[1].height = 35
     ws.freeze_panes = "A2"
     if ws.max_row > 1:
         ws.auto_filter.ref = ws.dimensions
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.fitToWidth, ws.page_setup.fitToHeight = 1, 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.print_title_rows = "1:1"
+
+
+def status_tone(doc: DocState) -> str:
+    """green = result available, red = failed, orange = anything else (warnings, skipped, stopped, duplicate)."""
+    if doc.status in (SUCCEEDED, REUSED) and not doc.warnings:
+        return "success"
+    return "danger" if doc.status == FAILED else "warning"
+
+
+def _paint_status(ws, tones: list[str]) -> None:
+    column = STATUS_COLUMNS.index("وضعیت") + 1
+    for row_index, tone in enumerate(tones, start=2):
+        fill, color = TONES[tone]
+        cell = ws.cell(row_index, column)
+        cell.fill, cell.font = fill, Font(name=FONT, size=11, bold=True, color=color)
 
 
 def _sheet_value(column: str, value):
@@ -169,6 +211,7 @@ def build_workbook(state: RequestState) -> bytes:
     kept = _kept_pdfs(state)
     ws = workbook.create_sheet(STATUS_SHEET, 0)
     ws.append(STATUS_COLUMNS)
+    tones = []
     for number, d in enumerate(docs, start=1):
         doc, summary = d.doc, d.doc.summary or {}
         explanation = doc_explanation(doc)
@@ -193,7 +236,9 @@ def build_workbook(state: RequestState) -> bytes:
             _yes_no(doc.stored) if has_result else "", _yes_no(doc.document_id in kept) if state.persist else "خیر",
             doc.document_id,
         ])
+        tones.append("warning" if has_result and d.rows is None else status_tone(doc))
     _style(ws, STATUS_COLUMNS)
+    _paint_status(ws, tones)
 
     buffer = io.BytesIO()
     workbook.save(buffer)

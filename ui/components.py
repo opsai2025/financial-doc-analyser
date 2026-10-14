@@ -156,10 +156,10 @@ def file_label(name: str) -> str:
     return f"⁨{name}⁩"
 
 
-def usage_bar(label: str, value_text: str, fraction: float) -> None:
-    """Quota usage bar (D-12.14): green, orange from 70 %, red when full."""
+def usage_bar(label: str, value_text: str, fraction: float, *, red_from: float = 1.0) -> None:
+    """Quota usage bar (D-12.14): green, orange from 70 %, red when full (or from `red_from`)."""
     fraction = max(0.0, min(1.0, fraction))
-    tone = "full" if fraction >= 1 else "high" if fraction >= 0.7 else "ok"
+    tone = "full" if fraction >= red_from else "high" if fraction >= 0.7 else "ok"
     st.html(
         f"""
         <div class="fda-usage fda-usage-{tone}">

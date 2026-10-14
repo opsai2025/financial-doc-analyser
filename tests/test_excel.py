@@ -43,6 +43,16 @@ def test_sheets_columns_and_status(env):
     assert rows[0]["ذخیره_در_پایگاه"] == "بله" and rows[0]["PDF_نگه‌داری_شد"] == "بله"
     assert rows[1]["توضیح"] and rows[1]["زمان_تحلیل"] in (None, "")
 
+    # Polish (backlog Q2): status colours, paragraph alignment, number formats, print layout
+    status_col = headers(status).index("وضعیت") + 1
+    assert [status.cell(r, status_col).fill.start_color.rgb[-6:] for r in (2, 3, 4)] == ["C6EFCE", "FFC7CE", "C6EFCE"]
+    key_points = summary.cell(2, headers(summary).index("نکات_کلیدی_و_نتیجه_گیری") + 1)
+    assert (key_points.alignment.horizontal, key_points.alignment.vertical) == ("right", "top")
+    assert summary.cell(2, 1).alignment.horizontal == "center"
+    assert status.cell(2, headers(status).index("توکن_ورودی") + 1).number_format == "#,##0"
+    assert status.page_setup.orientation == "landscape" and status.sheet_properties.pageSetUpPr.fitToPage
+    assert status.print_title_rows == "$1:$1"
+
 
 def test_guest_workbook_from_memory(env):
     guest = env.user("gst", Role.GUEST, guest_doc_cap=3)

@@ -46,11 +46,13 @@ def db(tmp_path):
     from core.config import get_settings
     from core.db import create_schema, init_engine
     from services.app_settings import clear_cache
+    from services.usage import clear_cache as clear_usage_cache
     from services.storage import get_storage
 
     get_settings.cache_clear()
     get_storage.cache_clear()
     clear_cache()
+    clear_usage_cache()
     if PG_URL:
         reset_postgres(PG_URL)
         engine = init_engine(PG_URL)

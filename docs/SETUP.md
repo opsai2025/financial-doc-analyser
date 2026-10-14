@@ -32,8 +32,8 @@ For each project:
 Tables are created automatically on first start.
 
 ### Free-tier limits to keep in mind
-- 500 MB database, 1 GB storage per project — the app enforces per-user quotas and reports usage to admins.
-- **Projects pause after ~7 days without activity.** Resume from the dashboard, or keep the app in regular use.
+- 500 MB database, 1 GB storage per project — the app enforces per-user quotas; admins see the totals in Settings › «مصرف منابع» and a warning bar from 80 % (D-16.5).
+- **Projects pause after ~7 days without activity.** The keep-alive workflow (section 7.6) prevents it; otherwise resume from the dashboard (the app then shows a Persian "database unavailable" message).
 
 ## 4. Run
 ```bash
@@ -115,4 +115,11 @@ Tables and the storage bucket are created automatically at the first start (migr
 - The app **sleeps** when no browser tab is open and wakes on the next visit (first load is slower). Work that was running when it stopped is marked «متوقف شده»; continue it with «ادامه یا اجرای مجدد». The analysis page reminds users to keep the page open.
 - The local disk is temporary: logs and spooled uploads are lost on restart (by design; PDFs and results are in Supabase).
 - Running hours per month are limited (see your plan page).
-- Supabase free projects pause after ~7 days without activity (section 3).
+- Supabase free projects pause after ~7 days without activity (section 3); see 7.6.
+
+### 7.6 Keep the database awake (D-16.6)
+`.github/workflows/keep-supabase-awake.yml` runs `select 1` against the database every 3 days, only in `roozbahani-workspace/financial-doc-analysor`.
+1. GitHub → that repo → **Settings → Secrets and variables → Actions → New repository secret**: name `DATABASE_URL`, value = the same `DATABASE_URL` as in Posit's Variables.
+2. **Actions** tab → «Keep Supabase awake» → **Run workflow** once; the run should end green with "Database reachable."
+3. GitHub disables scheduled workflows after 60 days without commits and emails you first: re-enable it in the Actions tab.
+If the database ever pauses anyway: Supabase dashboard → the project → **Restore project**, then refresh the app.

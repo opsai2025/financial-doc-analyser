@@ -7,18 +7,11 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import func, select
 
-from core.config import (
-    DEFAULT_ANALYST_DB_QUOTA_MB,
-    DEFAULT_ANALYST_DOCS_PER_DAY,
-    DEFAULT_ANALYST_DOCS_PER_HOUR,
-    DEFAULT_ANALYST_STORAGE_QUOTA_MB,
-    DEFAULT_GUEST_DOC_CAP,
-    DEFAULT_GUEST_VALID_DAYS,
-)
 from core.db import session_scope
 from core.models import Role, User, utcnow
 from core.security import USERNAME_HINT, USERNAME_RE, generate_temp_password, hash_password, password_policy_errors
 from core.text_normalize import normalize_text
+from services import app_settings
 
 ROLE_LABELS: dict[Role, str] = {
     Role.ADMIN: "مدیر سامانه",
@@ -56,15 +49,15 @@ class UserForm:
 
 
 def default_form(role: Role) -> UserForm:
+    """A new account pre-filled with the admin's current defaults (D-16.3, D-16.4)."""
     form = UserForm(display_name="", role=role)
     if role is Role.ANALYST:
-        form.docs_per_hour = DEFAULT_ANALYST_DOCS_PER_HOUR
-        form.docs_per_day = DEFAULT_ANALYST_DOCS_PER_DAY
-        form.db_quota_mb = DEFAULT_ANALYST_DB_QUOTA_MB
-        form.storage_quota_mb = DEFAULT_ANALYST_STORAGE_QUOTA_MB
+        d = app_settings.get_many(("new_docs_per_hour", "new_docs_per_day", "new_db_quota_mb", "new_storage_quota_mb"))
+        form.docs_per_hour, form.docs_per_day = d["new_docs_per_hour"], d["new_docs_per_day"]
+        form.db_quota_mb, form.storage_quota_mb = d["new_db_quota_mb"], d["new_storage_quota_mb"]
     elif role is Role.GUEST:
-        form.guest_doc_cap = DEFAULT_GUEST_DOC_CAP
-        form.guest_valid_days = DEFAULT_GUEST_VALID_DAYS
+        d = app_settings.get_many(("new_guest_doc_cap", "new_guest_valid_days"))
+        form.guest_doc_cap, form.guest_valid_days = d["new_guest_doc_cap"], d["new_guest_valid_days"]
     return form
 
 

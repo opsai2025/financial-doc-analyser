@@ -5,6 +5,7 @@ import httpx
 import pytest
 
 from services.storage import LocalStorage, SupabaseStorage, object_path
+from services.app_settings import UploadLimits
 from services.uploads import from_pdfs, from_zip
 
 
@@ -46,7 +47,7 @@ def test_supabase_storage_requests():
 
 
 def test_uploads_validation():
-    intake = from_pdfs([("a.pdf", b"%PDF-1 a"), ("b.pdf", b"not a pdf")])
+    intake = from_pdfs([("a.pdf", b"%PDF-1 a"), ("b.pdf", b"not a pdf")], UploadLimits())
     assert [f.name for f in intake.files] == ["a.pdf"] and len(intake.rejected) == 1
 
     buffer = io.BytesIO()
@@ -54,7 +55,7 @@ def test_uploads_validation():
         zf.writestr("folder/۱۳۹۸.pdf", b"%PDF-1 x")
         zf.writestr("notes.txt", b"hi")
         zf.writestr("__MACOSX/._x.pdf", b"junk")
-    intake = from_zip(buffer.getvalue())
+    intake = from_zip(buffer.getvalue(), UploadLimits())
     assert [f.name for f in intake.files] == ["۱۳۹۸.pdf"]
     assert len(intake.rejected) == 1
-    assert from_zip(b"garbage").rejected
+    assert from_zip(b"garbage", UploadLimits()).rejected

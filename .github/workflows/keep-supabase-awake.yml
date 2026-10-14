@@ -1,0 +1,37 @@
+# Keeps the free Supabase project from pausing after ~7 days without activity (D-16.6).
+# Runs `select 1` against the production database every 3 days. Needs the repository secret
+# DATABASE_URL (the same value as the Posit variable). Runs only in the owner's main repo.
+# GitHub disables scheduled workflows after 60 days without commits; re-enable in the Actions tab.
+name: Keep Supabase awake
+
+on:
+  schedule:
+    - cron: "17 4 */3 * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    if: github.repository == 'roozbahani-workspace/financial-doc-analysor'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Install the Postgres driver
+        run: python3 -m pip install --quiet "psycopg[binary]>=3.2,<4"
+      - name: Ping the database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python3 - <<'EOF'
+          import os
+          import psycopg
+
+          url = os.environ.get("DATABASE_URL", "")
+          if not url:
+              raise SystemExit("Repository secret DATABASE_URL is not set.")
+          url = url.replace("postgresql+psycopg://", "postgresql://", 1)
+          with psycopg.connect(url, connect_timeout=30) as conn:
+              conn.execute("select 1")
+          print("Database reachable.")
+          EOF

@@ -8,14 +8,17 @@ from __future__ import annotations
 import logging
 
 import streamlit as st
+from sqlalchemy.exc import InterfaceError, OperationalError
 
 from core.config import ConfigError, get_settings
+from core.fa import fa_digits
 from core.logging_setup import configure_logging
 from core.migrate import upgrade_database
 from core.models import Role
 from services.auth import ensure_bootstrap_admin
 from services.jobs import get_job_manager
 from services.providers import purge_expired_guest_providers
+from services.usage import warnings_for_admin
 from services.users import ROLE_LABELS
 from ui.auth_views import change_password_view, login_view
 from ui.components import app_header, inject_theme, md_escape, redirect, sidebar_brand
@@ -41,10 +44,24 @@ def bootstrap() -> str | None:
     return error
 
 
+# Shown when the database can't be reached, e.g. a free Supabase project paused after a week
+# without activity (D-16.6).
+DB_UNAVAILABLE = (
+    "پایگاه داده در دسترس نیست. اگر سامانه چند روز استفاده نشده باشد، پروژه رایگان Supabase به‌طور خودکار "
+    "متوقف می‌شود: مدیر سامانه باید آن را در داشبورد Supabase دوباره فعال کند (Restore project)، "
+    "سپس این صفحه را تازه کنید. اگر مشکل ادامه داشت، تنظیم DATABASE_URL را بررسی کنید."
+)
+
+
 def fatal(message: str) -> None:
     app_header()
     st.error(message, icon=":material/error:")
     st.stop()
+
+
+def db_unavailable() -> None:
+    logging.getLogger(__name__).exception("Database unreachable")
+    fatal(DB_UNAVAILABLE)
 
 
 try:
@@ -53,7 +70,7 @@ except ConfigError as exc:
     fatal(f"پیکربندی سامانه ناقص است: {exc}")
 except Exception:  # database unreachable, etc.
     logging.getLogger(__name__).exception("Startup failed")
-    fatal("اتصال به پایگاه داده برقرار نشد. تنظیمات DATABASE_URL را بررسی کنید.")
+    fatal(DB_UNAVAILABLE)
 if bootstrap_error:
     fatal(bootstrap_error)
 
@@ -63,7 +80,10 @@ if pending := st.session_state.pop("pending_redirect", None):
     st.info("در حال انتقال…", icon=":material/hourglass_top:")
     st.stop()
 
-current_user = resolve_user()
+try:
+    current_user = resolve_user()
+except (OperationalError, InterfaceError):
+    db_unavailable()
 
 # --- Pages ---------------------------------------------------------------------------------
 
@@ -131,9 +151,17 @@ with st.sidebar:
         st.rerun()
 
 app_header()
+if current_user.is_admin:  # resources near the hosting plan's limits (D-16.5)
+    for resource, fraction in warnings_for_admin():
+        name = "پایگاه داده" if resource == "db" else "فضای فایل"
+        st.warning(f"مصرف {name} به {fa_digits(round(fraction * 100))}٪ سقف طرح Supabase رسیده است. "
+                   "جزئیات: «تنظیمات سامانه» › «مصرف منابع».", icon=":material/database:")
 selected_key = next((k for k, (pg, _) in PAGES.items() if pg.url_path == selected.url_path), None)
 if selected_key in allowed or selected.url_path == HOME_PAGE.url_path:
-    selected.run()
+    try:
+        selected.run()
+    except (OperationalError, InterfaceError):
+        db_unavailable()
 else:
     st.warning("شما به این بخش دسترسی ندارید. از منوی کناری یکی از بخش‌های مجاز را انتخاب کنید.",
                icon=":material/lock:")

@@ -13,11 +13,10 @@ from collections.abc import Callable
 import pandas as pd
 import streamlit as st
 
-from core.config import MAX_PDF_MB
 from core.db import session_scope
 from core.fa import fa_digits, fa_number, jalali_datetime, to_tehran
 from core.models import Role
-from services import history, results
+from services import app_settings, history, results
 from services import providers as pv
 from services.auth import CurrentUser
 from services.excel import build_workbook, workbook_name
@@ -281,7 +280,8 @@ def _reupload(state: RequestState, user: CurrentUser, key: str, missing) -> None
         st.caption("همان فایل‌ها را دوباره بارگذاری کنید؛ فایل‌ها بر اساس محتوا شناسایی می‌شوند و نام فایل مهم نیست.")
         nonce = st.session_state.setdefault(f"{key}_reup_nonce", 0)
         uploads = st.file_uploader("فایل‌های PDF", type=["pdf"], accept_multiple_files=True,
-                                   key=f"{key}_reup_{state.id}_{nonce}", max_upload_size=MAX_PDF_MB)
+                                   key=f"{key}_reup_{state.id}_{nonce}",
+                                   max_upload_size=app_settings.get("max_pdf_mb"))
         if uploads and st.button("پیوست فایل‌ها", icon=":material/attach_file:", key=f"{key}_reup_go_{state.id}"):
             intake = from_pdfs([(f.name, f.getvalue()) for f in uploads])
             try:

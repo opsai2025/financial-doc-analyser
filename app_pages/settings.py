@@ -1,14 +1,17 @@
+import logging
+
 import pandas as pd
 import streamlit as st
 
 from core.config import MAX_PARALLEL_CALLS_RANGE
 from core.fa import fa_digits, fa_number
 from core.models import Role
-from services import app_settings
+from services import app_settings, usage
 from services import providers as pv
 from services.jobs import get_job_manager
+from services.quota import MB
 from services.users import ROLE_LABELS, list_users
-from ui.components import Card, cards_row, help_box, md_escape, page_title, show_errors
+from ui.components import Card, cards_row, help_box, md_escape, page_title, show_errors, usage_bar
 from ui.provider_editor import provider_help, provider_manager
 from ui.session import require_user
 
@@ -18,10 +21,10 @@ if not admin.is_admin:
 
 page_title("تنظیمات سامانه", "settings", "ارائه‌دهندگان، مدل‌ها و کلیدهای API مشترک و دسترسی کاربران به آن‌ها")
 
-tab_providers, tab_access, tab_engine, tab_defaults = st.tabs([
+tab_providers, tab_access, tab_engine, tab_defaults, tab_usage = st.tabs([
     ":material/hub: ارائه‌دهندگان، مدل‌ها و کلیدها", ":material/admin_panel_settings: دسترسی‌ها",
-    ":material/speed: وضعیت موتور", ":material/tune: مقادیر پیش‌فرض",
-])
+    ":material/speed: وضعیت موتور", ":material/tune: مقادیر پیش‌فرض", ":material/database: مصرف منابع",
+], key="settings_tabs", on_change="rerun")
 
 with tab_providers:
     provider_help(own=False)
@@ -182,6 +185,31 @@ with tab_engine:
     )
     engine_status()
 
+def setting_inputs(names: tuple[str, ...], values: dict[str, int], key: str) -> dict[str, int]:
+    """One number input per setting, side by side."""
+    columns = st.columns(len(names))
+    chosen = {}
+    for column, name in zip(columns, names, strict=True):
+        s = app_settings.SETTINGS[name]
+        chosen[name] = column.number_input(s.label, s.low, s.high, values[name], key=f"{key}_{name}",
+                                           help=f"بین {fa_digits(s.low)} تا {fa_digits(s.high)}")
+    return chosen
+
+
+ANALYST_DEFAULTS = ("new_docs_per_hour", "new_docs_per_day", "new_db_quota_mb", "new_storage_quota_mb")
+GUEST_DEFAULTS = ("new_guest_doc_cap", "new_guest_valid_days")
+UPLOAD_LIMITS = ("max_pdf_mb", "max_files_per_batch", "max_zip_mb")
+PLAN_LIMITS = ("db_limit_mb", "storage_limit_mb")
+
+
+def save_settings(values: dict[str, int], message: str) -> None:
+    try:
+        app_settings.set_many(values)
+        st.toast(message, icon=":material/check_circle:")
+    except app_settings.SettingError as exc:
+        show_errors(exc)
+
+
 with tab_defaults:
     st.subheader(":material/bolt: ظرفیت پردازش سرور", anchor=False)
     low, high = MAX_PARALLEL_CALLS_RANGE
@@ -199,8 +227,96 @@ with tab_defaults:
             except app_settings.SettingError as exc:
                 show_errors(exc)
     st.caption("محدودیت هر کلید (هم‌زمانی، RPM و RPD) در زبانه «ارائه‌دهندگان، مدل‌ها و کلیدها» تنظیم می‌شود.")
+
+    current = app_settings.get_many(app_settings.SETTINGS)
+    st.subheader(":material/person_add: سهمیه پیش‌فرض کاربران جدید", anchor=False)
     help_box(
-        "سایر مقادیر پیش‌فرض",
-        ["ویرایش مقادیر پیش‌فرض سهمیه‌ها، سقف بارگذاری و آمار مصرف در مرحله ۴ اضافه می‌شود."],
-        variant="green", icon="construction",
+        "این مقادیر فقط برای حساب‌های جدید است",
+        ["هنگام ساخت کاربر در «مدیریت کاربران»، فرم با این مقادیر پر می‌شود و قابل تغییر است.",
+         "سهمیه کاربران فعلی تغییر نمی‌کند؛ آن را برای هر کاربر در «مدیریت کاربران» ویرایش کنید."],
+        variant="blue", icon="info", key="new_user_defaults_help",
     )
+    with st.form("new_user_defaults_form", border=True):
+        st.markdown("**تحلیلگر**")
+        analyst = setting_inputs(ANALYST_DEFAULTS, current, "def")
+        st.markdown("**مهمان**")
+        guest = setting_inputs(GUEST_DEFAULTS, current, "def")
+        if st.form_submit_button("ذخیره", type="primary", icon=":material/save:"):
+            save_settings({**analyst, **guest}, "مقادیر پیش‌فرض کاربران جدید ذخیره شد.")
+
+    st.subheader(":material/upload_file: محدودیت بارگذاری", anchor=False)
+    with st.form("upload_limits_form", border=True):
+        uploads = setting_inputs(UPLOAD_LIMITS, current, "upl")
+        st.caption("برای همه کاربران و از همین لحظه اعمال می‌شود. سقف حجم هر مدل (در تنظیمات مدل) "
+                   "اگر کمتر باشد، همچنان رعایت می‌شود. حجم ZIP بیش از ۳۰۰ مگابایت را سرور نمی‌پذیرد.")
+        if st.form_submit_button("ذخیره", type="primary", icon=":material/save:"):
+            save_settings(uploads, "محدودیت بارگذاری ذخیره شد و بلافاصله اعمال می‌شود.")
+
+
+def mb_text(value: int) -> str:
+    return fa_digits(f"{value / MB:,.1f}").replace(",", "٬")
+
+
+ROLE_BY_VALUE = {str(r): r for r in Role}
+
+def usage_tab() -> None:
+    help_box(
+        "مصرف منابع در برابر سقف طرح Supabase",
+        ["**پایگاه داده:** اندازه واقعی پایگاه داده، همان عددی که Supabase می‌شمارد (شامل جدول‌ها، نمایه‌ها و "
+         "داده‌های داخلی). عدد «مصرف کاربران» پایین‌تر فقط نتایج و پاسخ‌های نگه‌داری‌شده است و کمتر از آن است.",
+         "**فضای فایل:** فایل‌های PDF نگه‌داری‌شده؛ هر فایل یکسان فقط یک بار ذخیره می‌شود.",
+         "نوار از ۷۰٪ نارنجی و از ۹۰٪ قرمز می‌شود؛ از ۸۰٪ مدیران در همه صفحه‌ها هشدار می‌بینند.",
+         "حجم دانلود ماهانه (egress) در این صفحه شمرده نمی‌شود؛ آن را در داشبورد Supabase ببینید."],
+        variant="blue", icon="info", expanded=False, key="usage_help",
+    )
+    try:
+        system = usage.system_usage()
+    except Exception:
+        st.error("اندازه پایگاه داده خوانده نشد. جزئیات در گزارش سرور ثبت شد.", icon=":material/error:")
+        logging.getLogger(__name__).exception("Usage overview failed")
+        system = None
+    if system is not None:
+        usage_bar("پایگاه داده", f"{mb_text(system.db_bytes)} از {mb_text(system.db_limit_bytes)} مگابایت "
+                  f"({fa_digits(round(system.db_fraction * 100))}٪)", system.db_fraction, red_from=0.9)
+        usage_bar("فضای فایل (PDF)", f"{mb_text(system.storage_bytes)} از {mb_text(system.storage_limit_bytes)} مگابایت "
+                  f"({fa_digits(round(system.storage_fraction * 100))}٪) · {fa_number(system.storage_files)} فایل",
+                  system.storage_fraction, red_from=0.9)
+
+    st.subheader(":material/group: مصرف کاربران", anchor=False)
+    people = usage.per_user()
+    if people:
+        table = pd.DataFrame([{
+            "کاربر": f"{u.display_name} ({u.username})",
+            "نقش": ROLE_LABELS.get(ROLE_BY_VALUE.get(u.role), u.role),
+            "درخواست‌ها": u.requests,
+            "اسناد ۲۴ ساعت": u.docs_24h,
+            "نتایج (مگابایت)": round(u.results_bytes / MB, 1),
+            "PDF (مگابایت)": round(u.pdf_bytes / MB, 1),
+        } for u in people])
+        st.dataframe(table[table.columns[::-1]], hide_index=True, column_config={
+            "کاربر": st.column_config.TextColumn(width=220),
+            "نتایج (مگابایت)": st.column_config.NumberColumn(format="%.1f"),
+            "PDF (مگابایت)": st.column_config.NumberColumn(format="%.1f"),
+        })
+        st.caption("فایلی که چند کاربر نگه داشته‌اند برای هر کدام شمرده می‌شود (سهمیه هر کاربر)، "
+                   "ولی در فضای فایل بالا فقط یک بار.")
+
+    if system is not None and system.tables:
+        st.subheader(":material/table_chart: بزرگ‌ترین جدول‌ها", anchor=False)
+        table = pd.DataFrame([{"جدول": t.name, "حجم (مگابایت)": round(t.bytes / MB, 2),
+                               "تعداد تقریبی ردیف": "—" if t.rows is None else f"{t.rows:,}"} for t in system.tables])
+        st.dataframe(table[table.columns[::-1]], hide_index=True)
+
+    st.subheader(":material/tune: سقف طرح", anchor=False)
+    with st.form("plan_limits_form", border=True):
+        plan = setting_inputs(PLAN_LIMITS, app_settings.get_many(PLAN_LIMITS), "plan")
+        st.caption("طرح رایگان Supabase: ۵۰۰ مگابایت پایگاه داده و ۱ گیگابایت (۱۰۲۴ مگابایت) فضای فایل. "
+                   "اگر طرح را ارتقا دادید، سقف جدید را اینجا وارد کنید.")
+        if st.form_submit_button("ذخیره", type="primary", icon=":material/save:"):
+            save_settings(plan, "سقف طرح ذخیره شد.")
+            usage.clear_cache()
+
+
+if tab_usage.open:  # measured only when the tab is shown
+    with tab_usage:
+        usage_tab()
