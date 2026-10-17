@@ -46,6 +46,8 @@ def test_cover_and_documents_without_result(env):
     normal = doc.styles["Normal"].element.xml
     assert 'w:cs="B Nazanin"' in normal and 'w:szCs w:val="25"' in normal and "w:bidi" in normal
     assert "w:bidiVisual" in doc.element.body.xml and "w:tblHeader" in doc.element.body.xml
+    font_table = next(r.target_part.blob for r in doc.part.rels.values() if r.reltype.endswith("/fontTable"))
+    assert b'<w:font w:name="B Nazanin"><w:charset w:val="B2"/>' in font_table  # D-18.1
 
 
 def test_items_by_company_in_chronological_order(env):

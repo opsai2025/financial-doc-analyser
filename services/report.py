@@ -145,8 +145,20 @@ def _style(document, name: str, *, size: float, bold: bool = False, color: RGBCo
     return style
 
 
+def _declare_font(document) -> None:
+    """List the report font in the font table with the Arabic charset (B2 = 178), as Word itself saves
+    B Nazanin, so Word picks it for display instead of a font matching the default charset (D-18.1)."""
+    for rel in document.part.rels.values():
+        if rel.reltype.endswith("/fontTable"):
+            part = rel.target_part
+            entry = (f'<w:font w:name="{FONT}"><w:charset w:val="B2"/><w:family w:val="auto"/>'
+                     '<w:pitch w:val="variable"/></w:font></w:fonts>')
+            part._blob = part.blob.replace(b"</w:fonts>", entry.encode("utf-8"), 1)
+
+
 def _new_document():
     document = Document()
+    _declare_font(document)
     section = document.sections[0]
     section.page_height, section.page_width = Cm(29.7), Cm(21.0)
     section.top_margin = section.bottom_margin = Cm(2.0)

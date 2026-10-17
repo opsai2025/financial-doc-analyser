@@ -21,12 +21,12 @@ Workflow per step: decision session (explain current behaviour first, visually) 
 
 **Deferred backlog (DECISIONS §16), all committed and tested by the owner**, including the Word report and the keep-alive workflow (the owner added the `DATABASE_URL` secret).
 
-**Round 2 (DECISIONS §17), committed:** dashboard basis tab removed, Excel and Word in B Nazanin, Word organised by company with a «سند» column in chronological order, the empty-basis bug fixed (D-17.3), Word checklist limited to topics found in the report.
+**Round 2 (DECISIONS §17), committed:** dashboard basis tab removed, Excel and Word in B Nazanin, Word organised by company with a «سند» column in chronological order, the empty-basis bug fixed (D-17.3), Word checklist limited to topics found in the report. Round 3 (DECISIONS §18): B Nazanin declared with the Arabic charset, so Excel shows it outside edit mode.
 
 **⚠ Reminder:** D-15.9 is a **Posit-only workaround**. When the app is deployed anywhere else, undo it (block `POSIT WORKAROUND` in `ui/session.py`) and tell the owner.
 
 **Next steps, in order:**
-1. **Owner tests round 2** in production; their points come back as the next batch.
+1. **Owner tests round 2 and the Excel/Word font fix (D-18.1)** in production; their points come back as the next batch.
 2. **Final review round**: deferred test points from 2b on, plus the open items below.
 
 **Owner context:** time is very limited — keep decision pages short with recommendations preselected. The dev Supabase project (`fin-doc-dev`) exists but its values are not in the local `.env` yet (local runs use SQLite). `data/posit-secrets.txt` (git-ignored) holds the production `APP_SECRET_KEY`/`APP_ENCRYPTION_KEY`; the owner should keep them in a password manager and may delete the file. Supabase free projects pause after ~7 days without activity.

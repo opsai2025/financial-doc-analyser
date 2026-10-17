@@ -52,7 +52,8 @@ def test_sheets_columns_and_status(env):
     assert status.cell(2, headers(status).index("توکن_ورودی") + 1).number_format == "#,##0"
     assert status.page_setup.orientation == "landscape" and status.sheet_properties.pageSetUpPr.fitToPage
     assert status.print_title_rows == "$1:$1"
-    assert {(c.font.name, c.font.sz) for ws in book for row in ws.iter_rows() for c in row} == {("B Nazanin", 12)}
+    fonts = {(c.font.name, c.font.sz, c.font.charset) for ws in book for row in ws.iter_rows() for c in row}
+    assert fonts == {("B Nazanin", 12, 178)}  # Arabic charset, or Excel shows it only while editing (D-18.1)
 
 
 def test_guest_workbook_from_memory(env):
