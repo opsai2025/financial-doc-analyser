@@ -1,15 +1,19 @@
-"""Word report of one request (D-16.1, W1–W4).
+"""Word report of one request (D-16.1, D-17.4–D-17.8).
 
 Built on demand from the same rows as the Excel workbook and never stored (D-3.3). A4 portrait,
-right-to-left, Vazirmatn: a cover with the request's details and a summary table, then one
-section per document with everything the Excel has, laid out for reading. Items marked "not
-applicable" are left out (they stay in Excel); no charts.
+right-to-left, B Nazanin: a cover with the request's details and a summary table, then one section
+per company (grouped as on the dashboard) in which every topic lists the items of all its
+documents together, in chronological order, each row labelled with its document («سند»).
+Items of sections marked "not applicable" and checklist rows not found in the report are left
+out (they stay in Excel); no charts.
 """
 
 from __future__ import annotations
 
 import io
 import unicodedata
+from collections import Counter
+from dataclasses import dataclass
 
 from docx import Document
 from docx.oxml import OxmlElement
@@ -19,37 +23,49 @@ from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 
 from core.fa import fa_digits, jalali_datetime
 from core.models import utcnow
-from services.dashboard import applicable
+from services.dashboard import applicable, company_key
 from services.excel import DocRows, collect_docs
 from services.jobs import RequestState, doc_explanation, doc_status_label
 
-FONT = "Vazirmatn"
+FONT = "B Nazanin"  # D-17.4; Word substitutes where it is not installed
+SIZES = {"body": 12.5, "cell": 11.5, "h1": 19, "h2": 16, "h3": 13.5, "footer": 10}  # D-16.1 sizes + 2 pt
 NAVY = RGBColor(0x0F, 0x17, 0x2A)
 MUTED = RGBColor(0x52, 0x60, 0x7A)
 HEADER_FILL = "CCC0DA"  # the Excel header colour (D-16.2 keeps the v1 look)
 TITLE = "گزارش تحلیل گزارش‌های حسابرسی"
-NOT_IN_EXCEL_NOTE = ("متن‌ها همان پاسخ مدل است. مواردی که مدل «موضوعیت ندارد» تشخیص داده در این گزارش نیامده‌اند "
-                     "و در فایل اکسل همین درخواست موجودند.")
+NOT_IN_EXCEL_NOTE = ("متن‌ها همان پاسخ مدل است. مواردی که مدل «موضوعیت ندارد» تشخیص داده و موضوعاتی از چک‌لیست که "
+                     "در گزارش حسابرس نیامده‌اند، در این گزارش نیستند و در فایل اکسل همین درخواست موجودند. "
+                     "ستون «سند» هر ردیف را به سند آن (جدول «اسناد» هر شرکت) وصل می‌کند.")
 NONE_FOUND = "موردی ثبت نشده است."
+NO_YEAR = "بدون سال"
 LRE, RLE, POP = "\u202a", "\u202b", "\u202c"  # left/right-to-left embedding, pop
+DOC_COLUMN = ("سند", 1.9)  # first column of every company table (D-17.6)
 
-# Item tables per sheet: (heading, [(label, columns joined with " / ", width in cm)])
+# Item tables per sheet after the «سند» column: (heading, [(label, columns joined with " / ", width in cm)])
 ITEM_TABLES = (
-    ("basis", "مبانی اظهارنظر", (("شماره", ("item_no",), 1.4), ("عنوان", ("title",), 3.4), ("شرح", ("description",), 7.2),
-                                 ("نوع دلیل", ("reason_type",), 2.4), ("بند / صفحه", ("paragraph_no", "page_no"), 2.2))),
-    ("emphasis", "تأکید بر مطالب خاص", (("عنوان", ("title",), 3.2), ("شرح", ("description",), 6.4),
-                                        ("ریسک برجسته‌شده", ("highlighted_risk",), 2.8),
+    # basis items have no paragraph/page reference in the schema, so that (always empty) column is left out
+    ("basis", "مبانی اظهارنظر", (("شماره", ("item_no",), 1.5), ("عنوان", ("title",), 3.4), ("شرح", ("description",), 7.6),
+                                 ("نوع دلیل", ("reason_type",), 2.7))),
+    ("emphasis", "تأکید بر مطالب خاص", (("عنوان", ("title",), 2.9), ("شرح", ("description",), 5.0),
+                                        ("ریسک برجسته‌شده", ("highlighted_risk",), 2.6),
                                         ("دسته / زیرشاخه", ("risk_category", "risk_subcategory"), 2.6),
-                                        ("بند / صفحه", ("paragraph_no", "page_no"), 1.6))),
-    ("legal", "گزارش قانونی (تخلفات)", (("عنوان تخلف", ("violation_title",), 3.2), ("شرح", ("description",), 5.6),
-                                        ("مبانی قانونی", ("legal_bases",), 3.4),
+                                        ("بند / صفحه", ("paragraph_no", "page_no"), 2.0))),
+    ("legal", "گزارش قانونی (تخلفات)", (("عنوان تخلف", ("violation_title",), 2.9), ("شرح", ("description",), 4.6),
+                                        ("مبانی قانونی", ("legal_bases",), 3.0),
                                         ("دسته / زیرشاخه", ("category", "subcategory"), 2.6),
-                                        ("بند / صفحه", ("paragraph_no", "page_no"), 1.8))),
-    ("checklist", "چک‌لیست", (("موضوع", ("topic",), 3.6), ("در گزارش آمده", ("in_report",), 2.0),
-                              ("وضعیت", ("status",), 2.4), ("جزئیات", ("details",), 7.0),
-                              ("بند / صفحه", ("paragraph_no", "page_no"), 1.6))),
+                                        ("بند / صفحه", ("paragraph_no", "page_no"), 2.0))),
+    ("checklist", "چک‌لیست (موضوعات آمده در گزارش)", (("موضوع", ("topic",), 3.4), ("وضعیت", ("status",), 2.8),
+                                                      ("جزئیات", ("details",), 6.9),
+                                                      ("بند / صفحه", ("paragraph_no", "page_no"), 2.0))),
 )
-APPLICABILITY_SHEETS = ("basis", "emphasis", "legal")  # sheets with «موضوعیت_دارد» (as the dashboard)
+
+
+def keep_row(sheet: str, row: dict) -> bool:
+    """Items shown in the report: not the placeholder of a section marked not applicable (D-17.3);
+    checklist topics only when «در گزارش آمده» is true (D-17.7)."""
+    if sheet == "checklist":
+        return _text(row.get("in_report")) == "True"
+    return applicable(row)
 
 
 def report_name(state: RequestState) -> str:
@@ -79,12 +95,6 @@ def _file(name) -> str:
     return f"{LRE}{name}{POP}" if name else ""
 
 
-def _yes_no(value) -> str:
-    """Python-style flags the model's answers carry as text («در_گزارش_آمده»), shown in Persian."""
-    text = _text(value)
-    return {"True": "بله", "False": "خیر"}.get(text, text)
-
-
 # --- Right-to-left formatting (python-docx has no API for most of it) -------------------------
 
 def _insert(parent, tag: str, successors: tuple[str, ...]):
@@ -104,7 +114,7 @@ PPR_AFTER_BIDI = ("w:adjustRightInd", "w:snapToGrid", "w:spacing", "w:ind", "w:c
 
 
 def _font(rpr, *, size: float | None = None, bold: bool | None = None, color: RGBColor | None = None) -> None:
-    """Vazirmatn for every script, right-to-left; size and bold also for complex scripts (Persian)."""
+    """The report font for every script, right-to-left; size and bold also for complex scripts (Persian)."""
     fonts = rpr.get_or_add_rFonts()
     for attr in ("w:asciiTheme", "w:hAnsiTheme", "w:eastAsiaTheme", "w:cstheme"):
         fonts.attrib.pop(qn(attr), None)
@@ -141,10 +151,10 @@ def _new_document():
     section.page_height, section.page_width = Cm(29.7), Cm(21.0)
     section.top_margin = section.bottom_margin = Cm(2.0)
     section.left_margin = section.right_margin = Cm(2.0)
-    _style(document, "Normal", size=10.5, after=4)
-    _style(document, "Heading 1", size=17, bold=True, color=NAVY, after=8)
-    _style(document, "Heading 2", size=14, bold=True, color=NAVY, before=12, after=6)
-    _style(document, "Heading 3", size=11.5, bold=True, color=NAVY, before=10, after=4)
+    _style(document, "Normal", size=SIZES["body"], after=4)
+    _style(document, "Heading 1", size=SIZES["h1"], bold=True, color=NAVY, after=8)
+    _style(document, "Heading 2", size=SIZES["h2"], bold=True, color=NAVY, before=12, after=6)
+    _style(document, "Heading 3", size=SIZES["h3"], bold=True, color=NAVY, before=10, after=4)
     return document
 
 
@@ -156,7 +166,7 @@ def _paragraph(document, text: str, *, style: str | None = None, muted: bool = F
     return paragraph
 
 
-def _cell(cell, text: str, *, header: bool = False, size: float = 9.5) -> None:
+def _cell(cell, text: str, *, header: bool = False, size: float = SIZES["cell"]) -> None:
     paragraph = cell.paragraphs[0]
     paragraph.paragraph_format.space_after = Pt(0)
     run = paragraph.add_run(text)
@@ -205,23 +215,63 @@ def _summary(d: DocRows) -> dict:
     return ((d.rows or {}).get("summary") or [{}])[0]
 
 
-def _company(d: DocRows) -> str:
-    return _text(_summary(d).get("company_name") or (d.doc.summary or {}).get("company_name")) or "نامشخص"
+def _company_name(d: DocRows) -> str:
+    return _text(_summary(d).get("company_name") or (d.doc.summary or {}).get("company_name"))
 
 
-def _year(d: DocRows) -> str:
+def _year(d: DocRows) -> int | None:
     year = _summary(d).get("year") or (d.doc.summary or {}).get("year")
-    return fa_digits(year) if year else ""
+    try:
+        return int(year) if year is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+@dataclass
+class _Company:
+    name: str
+    docs: list[DocRows]  # chronological (D-17.8)
+    labels: dict[int, str]  # id(DocRows) -> «سند» label
+
+
+def _companies(docs: list[DocRows], merge_map: dict[str, str]) -> list[_Company]:
+    """Documents grouped like the dashboard: Level-B company key plus the user's merges (D-17.5)."""
+    groups: dict[str, list[tuple[str, DocRows]]] = {}
+    for d in docs:
+        own_key = company_key(_company_name(d)) or f"?{d.doc.document_id[:12]}"
+        groups.setdefault(merge_map.get(own_key, own_key), []).append((own_key, d))
+    companies = []
+    for group, members in groups.items():
+        own = [_company_name(d) for key, d in members if key == group and _company_name(d)]
+        name = Counter(own or [_company_name(d) for _, d in members if _company_name(d)] or ["نامشخص"]).most_common(1)[0][0]
+        ordered = sorted((d for _, d in members),
+                         key=lambda d: (_year(d) is None, _year(d) or 0, _text(d.doc.file_name), d.doc.position))
+        companies.append(_Company(name, ordered, _labels(ordered)))
+    return sorted(companies, key=lambda c: c.name)
+
+
+def _labels(ordered: list[DocRows]) -> dict[int, str]:
+    """«سند» label: the year, numbered when a company has several documents of that year (D-17.6)."""
+    per_year = Counter(_year(d) for d in ordered)
+    seen: Counter = Counter()
+    labels = {}
+    for d in ordered:
+        year = _year(d)
+        base = fa_digits(year) if year is not None else NO_YEAR
+        seen[year] += 1
+        labels[id(d)] = f"{base} ({fa_digits(seen[year])})" if per_year[year] > 1 else base
+    return labels
 
 
 def _joined(row: dict, columns: tuple[str, ...]) -> str:
-    return " / ".join(t for t in ((_yes_no if c == "in_report" else _text)(row.get(c)) for c in columns) if t)
+    return " / ".join(t for t in (_text(row.get(c)) for c in columns) if t)
 
 
-def _cover(document, state: RequestState, with_result: list[DocRows], without: list[DocRows]) -> None:
+def _cover(document, state: RequestState, companies: list[_Company], without: list[DocRows]) -> None:
     title = document.add_paragraph(TITLE, style="Heading 1")
     title.paragraph_format.alignment = 1  # center
-    counts = [f"{fa_digits(len(with_result))} سند با نتیجه"]
+    with_result = [d for c in companies for d in c.docs]
+    counts = [f"{fa_digits(len(with_result))} سند با نتیجه از {fa_digits(len(companies))} شرکت"]
     if without:
         counts.append(f"{fa_digits(len(without))} سند بدون نتیجه")
     models = sorted({f"{d.provider} › {d.model}" for d in with_result}) or [f"{state.provider_name} › {state.model_name}"]
@@ -236,11 +286,15 @@ def _cover(document, state: RequestState, with_result: list[DocRows], without: l
 
     document.add_paragraph("خلاصه اسناد", style="Heading 2")
     if with_result:
-        _table(document, ["ردیف", "شرکت", "سال", "نوع اظهارنظر", "سطح ریسک کلی", "فایل"], [
-            [fa_digits(number), _company(d), _year(d), _text(_summary(d).get("opinion_type")),
-             _text(_summary(d).get("overall_risk")), _file(d.doc.file_name)]
-            for number, d in enumerate(with_result, start=1)
-        ], [1.2, 4.4, 1.4, 3.0, 2.6, 4.4])
+        rows, number = [], 0
+        for company in companies:
+            for d in company.docs:
+                number += 1
+                rows.append([fa_digits(number), company.name, company.labels[id(d)],
+                             _text(_summary(d).get("opinion_type")), _text(_summary(d).get("overall_risk")),
+                             _file(d.doc.file_name)])
+        _table(document, ["ردیف", "شرکت", "سند", "نوع اظهارنظر", "سطح ریسک کلی", "فایل"], rows,
+               [1.2, 4.4, 1.9, 2.8, 2.5, 4.2])
     else:
         _paragraph(document, "هیچ سندی از این درخواست نتیجه ندارد.", muted=True)
 
@@ -256,54 +310,59 @@ def _cover(document, state: RequestState, with_result: list[DocRows], without: l
     _paragraph(document, NOT_IN_EXCEL_NOTE, muted=True)
 
 
-def _document_section(document, d: DocRows) -> None:
-    summary = _summary(d)
-    year = _year(d)
-    document.add_paragraph(f"{_company(d)} — {year}" if year else _company(d), style="Heading 2")
-    _key_values(document, [
-        ("حسابرس", _text(summary.get("auditor_name"))),
-        ("دوره مالی", _text(summary.get("fiscal_period"))),
-        ("نوع اظهارنظر", _text(summary.get("opinion_type"))),
-        ("سطح ریسک کلی", _text(summary.get("overall_risk"))),
-        ("فایل", _file(d.doc.file_name)),
-        ("مدل", _text(f"{d.provider} › {d.model}")),
-        ("زمان تحلیل", jalali_datetime(d.analysed_at) if d.analysed_at else ""),
-    ])
-    for heading, column in (("نکات کلیدی و نتیجه‌گیری", "key_points"), ("جزییات سطح ریسک", "risk_details")):
-        document.add_paragraph(heading, style="Heading 3")
-        _paragraph(document, _text(summary.get(column)) or NONE_FOUND, muted=not summary.get(column))
-
-    document.add_paragraph("بند اظهارنظر", style="Heading 3")
-    opinions = [r for r in d.rows.get("opinion", []) if _text(r.get("opinion_kind")) or _text(r.get("reasons_summary"))]
-    if opinions:
-        _table(document, ["نوع", "خلاصه دلایل"], [[_text(r.get("opinion_kind")), _text(r.get("reasons_summary"))]
-                                                   for r in opinions], [3.0, 14.0])
+def _topic(document, heading: str, headers: list[str], rows: list[list[str]], widths: list[float]) -> None:
+    document.add_paragraph(heading, style="Heading 3")
+    if rows:
+        _table(document, [DOC_COLUMN[0], *headers], rows, [DOC_COLUMN[1], *widths])
     else:
         _paragraph(document, NONE_FOUND, muted=True)
 
+
+def _company_section(document, company: _Company, several_models: bool) -> None:
+    """All documents of one company, topic by topic, rows in chronological order (D-17.6)."""
+    document.add_paragraph(company.name, style="Heading 2")
+    label = company.labels
+
+    headers = ["فایل", "دوره مالی", "حسابرس", "نوع اظهارنظر", "ریسک کلی"] + (["مدل"] if several_models else [])
+    widths = [3.4, 3.4, 3.0, 2.4, 2.0] if not several_models else [2.8, 2.8, 2.5, 2.2, 1.8, 2.0]
+    _topic(document, "اسناد", headers, [
+        [label[id(d)], _file(d.doc.file_name), _text(_summary(d).get("fiscal_period")),
+         _text(_summary(d).get("auditor_name")), _text(_summary(d).get("opinion_type")),
+         _text(_summary(d).get("overall_risk"))] + ([_text(f"{d.provider} › {d.model}")] if several_models else [])
+        for d in company.docs
+    ], widths)
+
+    for heading, column in (("نکات کلیدی و نتیجه‌گیری", "key_points"), ("جزییات سطح ریسک", "risk_details")):
+        _topic(document, heading, ["متن"], [[label[id(d)], _text(_summary(d).get(column))]
+                                            for d in company.docs if _text(_summary(d).get(column))], [15.1])
+
+    _topic(document, "بند اظهارنظر", ["نوع", "خلاصه دلایل"], [
+        [label[id(d)], _text(r.get("opinion_kind")), _text(r.get("reasons_summary"))]
+        for d in company.docs for r in d.rows.get("opinion", [])
+        if _text(r.get("opinion_kind")) or _text(r.get("reasons_summary"))
+    ], [2.8, 12.3])
+
     for sheet, heading, columns in ITEM_TABLES:
-        document.add_paragraph(heading, style="Heading 3")
-        rows = [r for r in d.rows.get(sheet, []) if sheet not in APPLICABILITY_SHEETS or applicable(r)]
-        if not rows:
-            _paragraph(document, NONE_FOUND, muted=True)
-            continue
-        _table(document, [label for label, _, _ in columns],
-               [[_joined(r, cols) for _, cols, _ in columns] for r in rows], [w for _, _, w in columns])
+        _topic(document, heading, [name for name, _, _ in columns], [
+            [label[id(d)], *(_joined(r, cols) for _, cols, _ in columns)]
+            for d in company.docs for r in d.rows.get(sheet, []) if keep_row(sheet, r)
+        ], [w for _, _, w in columns])
 
 
-def build_report(state: RequestState) -> bytes:
+def build_report(state: RequestState, merge_map: dict[str, str] | None = None) -> bytes:
+    """`merge_map`: the downloading user's company merges (member key -> main key), as on the dashboard."""
     docs = collect_docs(state)
-    with_result = [d for d in docs if d.rows]
+    companies = _companies([d for d in docs if d.rows], merge_map or {})
     without = [d for d in docs if not d.rows]
     document = _new_document()
     footer = document.sections[0].footer.paragraphs[0]
     footer.add_run(f"{TITLE} · {state.id}")
-    _font(footer.runs[0]._r.get_or_add_rPr(), size=8, color=MUTED)
-    _cover(document, state, with_result, without)
-    for d in with_result:
+    _font(footer.runs[0]._r.get_or_add_rPr(), size=SIZES["footer"], color=MUTED)
+    _cover(document, state, companies, without)
+    several_models = len({(d.provider, d.model) for c in companies for d in c.docs}) > 1
+    for company in companies:
         document.add_page_break()
-        _document_section(document, d)
+        _company_section(document, company, several_models)
     buffer = io.BytesIO()
     document.save(buffer)
     return buffer.getvalue()
-

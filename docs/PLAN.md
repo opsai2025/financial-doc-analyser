@@ -12,18 +12,21 @@ Decisions referenced as `D-x.y` live in [DECISIONS.md](DECISIONS.md). Problems o
 | 3 | Results dashboard | ✅ committed with the recommended answers (DECISIONS §13); round 1 refinements committed (DECISIONS §14) |
 | 4 | Deploy-readiness (reduced, D-15.1); exports/settings polish deferred | ✅ committed and **deployed on Posit** (DECISIONS §15) |
 | Backlog | Excel polish, editable defaults, usage overview, keep-alive; Word report | ✅ committed (DECISIONS §16) |
+| Round 2 | Owner's points on dashboard, Excel and Word | ✅ committed (DECISIONS §17) |
 
 Workflow per step: decision session (explain current behaviour first, visually) → implement → commit → owner tests → refinements (D-0.1, D-0.5).
 
 ## ▶ Where we are (handoff, 2026-10-14)
 **State:** all four steps are built (Step 4 reduced to deploy-readiness, D-15.1). The app **runs on Posit Connect Cloud (free plan)** with the Supabase **prod** project: https://01a12838-3819-792b-e228-5d14915a5b52.share.connect.posit.cloud. Code is on `main`, pushed to two public repos with `git push github main` (D-15.7, D-15.10). The owner's production check passed ("overall fine", 2026-10-14).
 
-**Deferred backlog (DECISIONS §16), all committed:** Excel polish, admin-editable defaults and upload limits, usage overview vs. Supabase limits with an admin warning, keep-alive workflow (the owner added the `DATABASE_URL` secret) and a "database unavailable" message (first commit, tested by the owner); the **Word report** per request (second commit).
+**Deferred backlog (DECISIONS §16), all committed and tested by the owner**, including the Word report and the keep-alive workflow (the owner added the `DATABASE_URL` secret).
+
+**Round 2 (DECISIONS §17), committed:** dashboard basis tab removed, Excel and Word in B Nazanin, Word organised by company with a «سند» column in chronological order, the empty-basis bug fixed (D-17.3), Word checklist limited to topics found in the report.
 
 **⚠ Reminder:** D-15.9 is a **Posit-only workaround**. When the app is deployed anywhere else, undo it (block `POSIT WORKAROUND` in `ui/session.py`) and tell the owner.
 
 **Next steps, in order:**
-1. **Owner tests the Word report** in production; their points come back as the next batch.
+1. **Owner tests round 2** in production; their points come back as the next batch.
 2. **Final review round**: deferred test points from 2b on, plus the open items below.
 
 **Owner context:** time is very limited — keep decision pages short with recommendations preselected. The dev Supabase project (`fin-doc-dev`) exists but its values are not in the local `.env` yet (local runs use SQLite). `data/posit-secrets.txt` (git-ignored) holds the production `APP_SECRET_KEY`/`APP_ENCRYPTION_KEY`; the owner should keep them in a password manager and may delete the file. Supabase free projects pause after ~7 days without activity.

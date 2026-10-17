@@ -34,7 +34,7 @@ from services.jobs import REUSED, SUCCEEDED, RequestState
 
 log = logging.getLogger(__name__)
 
-SHEETS_USED = ("summary", "emphasis", "legal", "checklist", "basis")
+SHEETS_USED = ("summary", "emphasis", "legal", "checklist")
 
 # Ordinal scales of the frozen schema (D-13.11)
 OPINIONS = ("مقبول", "مشروط", "مردود", "عدم اظهارنظر")
@@ -80,7 +80,12 @@ def ordinal(value: object, scale: tuple[str, ...]) -> int | None:
 
 
 def applicable(row: dict) -> bool:
-    return str(row.get("is_applicable")) == "True"
+    """False only for the placeholder row of a section marked not applicable (D-17.3).
+
+    The model marks «موضوعیت_دارد» per section; emphasis and legal items carry True, basis items
+    carry nothing (as in v1), and a section marked not applicable is stored as one row with False.
+    """
+    return str(row.get("is_applicable")) != "False"
 
 
 @dataclass
@@ -291,7 +296,7 @@ def items(records: list[DocRecord], sheet: str, *, only_applicable: bool = True)
     found = []
     for record in records:
         for row in record.rows.get(sheet, []):
-            if only_applicable and sheet in ("emphasis", "legal", "basis") and not applicable(row):
+            if only_applicable and sheet in ("emphasis", "legal") and not applicable(row):
                 continue
             found.append({**row, "year": record.year, "_company": record.company, "_file": record.file_name})
     return found

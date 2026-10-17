@@ -39,7 +39,7 @@ CUT_MARKER = "… متن کامل در JSON"
 # v1's long-text columns get a capped width (style_excel_file)
 LONG_TEXT = ("نکات_کلیدی_و_نتیجه_گیری", "جزئیات", "شرح", "خلاصه_دلایل", "جزییات_سطح_ریسک_تعیین_شده", "توضیح",
              EXTRA_COLUMN)
-FONT = "Vazirmatn"
+FONT, FONT_SIZE = "B Nazanin", 12  # every cell (D-17.2); Excel substitutes where it is not installed
 HEADER_FILL = PatternFill(start_color="CCC0DA", end_color="CCC0DA", fill_type="solid")
 ALT_FILL = PatternFill(start_color="F7F7F7", end_color="F7F7F7", fill_type="solid")
 THIN = Side(style="thin")
@@ -128,7 +128,7 @@ def _style(ws, headers: tuple[str, ...] | list[str]) -> None:
     landscape, one page wide, with the header row on every page.
     """
     ws.sheet_view.rightToLeft = True
-    base_font, header_font = Font(name=FONT, size=11), Font(name=FONT, size=11, bold=True)
+    base_font, header_font = Font(name=FONT, size=FONT_SIZE), Font(name=FONT, size=FONT_SIZE, bold=True)
     center = Alignment(horizontal="center", vertical="center", wrap_text=True)
     paragraph = Alignment(horizontal="right", vertical="top", wrap_text=True)
     long = [_is_long(h) for h in headers]
@@ -173,7 +173,7 @@ def _paint_status(ws, tones: list[str]) -> None:
     for row_index, tone in enumerate(tones, start=2):
         fill, color = TONES[tone]
         cell = ws.cell(row_index, column)
-        cell.fill, cell.font = fill, Font(name=FONT, size=11, bold=True, color=color)
+        cell.fill, cell.font = fill, Font(name=FONT, size=FONT_SIZE, bold=True, color=color)
 
 
 def _sheet_value(column: str, value):

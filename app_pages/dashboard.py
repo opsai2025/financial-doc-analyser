@@ -286,7 +286,7 @@ def company_view() -> None:
     def in_years(year) -> bool:
         return not picked_years or year in wanted
 
-    tabs = st.tabs(["خلاصه سال‌ها", "ریسک‌های برجسته", "تخلفات", "چک‌لیست", "مبانی اظهارنظر"])
+    tabs = st.tabs(["خلاصه سال‌ها", "ریسک‌های برجسته", "تخلفات", "چک‌لیست"])  # no basis tab (D-17.1)
     with tabs[0]:
         summary_table([r for r in rows if in_years(r.year)], with_company=len(company.member_keys) > 1)
     with tabs[1]:
@@ -297,8 +297,6 @@ def company_view() -> None:
         findings = [r for r in dash.items(rows, "checklist")
                     if in_years(r["year"]) and dash.ordinal(r.get("status"), dash.STATUSES) != 0]
         item_table(findings, "checklist")
-    with tabs[4]:
-        item_table([r for r in dash.items(rows, "basis") if in_years(r["year"])], "basis")
 
 
 # ---- Merges (D-13.5) -------------------------------------------------------------------------------

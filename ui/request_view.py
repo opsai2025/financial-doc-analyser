@@ -19,6 +19,7 @@ from core.models import Role
 from services import app_settings, history, results
 from services import providers as pv
 from services.auth import CurrentUser
+from services.dashboard import merges
 from services.excel import build_workbook, workbook_name
 from services.report import build_report, report_name
 from services.jobs import (
@@ -165,8 +166,9 @@ def _actions(state: RequestState, user: CurrentUser, key: str, on_deleted: Calla
         icon=":material/download:", key=f"{key}_excel_{state.id}", on_click="ignore", width="stretch",
         help="در حین اجرا، اسناد تمام‌شده با نتیجه و بقیه فقط در برگه وضعیت می‌آیند." if running else None,
     )
-    c4.download_button(  # D-16.1: same rows as the Excel, laid out for reading
-        "گزارش Word", lambda: build_report(manager.get(state.id, user) or state), file_name=report_name(state),
+    c4.download_button(  # D-16.1: same rows as the Excel, by company with the user's merges (D-17.5)
+        "گزارش Word", lambda: build_report(manager.get(state.id, user) or state, merges(user.id)),
+        file_name=report_name(state),
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", type="primary",
         icon=":material/description:", key=f"{key}_word_{state.id}", on_click="ignore", width="stretch",
         help="در حین اجرا، فقط اسناد تمام‌شده در گزارش می‌آیند." if running else None,
